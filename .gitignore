@@ -7,3 +7,15 @@ __pycache__
 # CDK asset staging directory
 .cdk.staging
 cdk.out
+
+# Lokalni test output (pravi podaci, ne idu na git)
+output/
+
+# Lambda invoke test output
+response.json
+
+# Environment varijable i tajne
+.env
+.env.*
+
+.vscode/
