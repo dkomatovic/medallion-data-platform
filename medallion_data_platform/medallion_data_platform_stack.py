@@ -46,12 +46,41 @@ class MedallionDataPlatformStack(Stack):
             },
         )
 
+        x_lambda = lambda_.Function(
+            self, "XLambda",
+            function_name="x-dataset-collector",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="handler.handler",
+            code=lambda_.Code.from_asset(
+                "lambdas/bronze/twitter",
+                bundling={
+                    "image": lambda_.Runtime.PYTHON_3_12.bundling_image,
+                    "command": [
+                        "bash", "-c",
+                        "pip install -r requirements.txt -t /asset-output && cp -r . /asset-output",
+                    ],
+                },
+            ),
+            timeout=Duration.minutes(5),
+            memory_size=256,
+            environment={
+                "S3_BUCKET_NAME": bronze_bucket.bucket_name,
+            },
+        )
+
         # Dozvola da Lambda pise u S3
         bronze_bucket.grant_write(hn_lambda)
+        bronze_bucket.grant_write(x_lambda)
 
         # EventBridge - pokrece Lambda svaki dan u 02:00 UTC
         events.Rule(
             self, "DailyHNSchedule",
             schedule=events.Schedule.cron(hour="2", minute="0"),
             targets=[targets.LambdaFunction(hn_lambda)],
+        )
+
+        events.Rule(
+            self, "DailyXSchedule",
+            schedule=events.Schedule.cron(hour="3", minute="0"),
+            targets=[targets.LambdaFunction(x_lambda)],   
         )
