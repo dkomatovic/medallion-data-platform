@@ -7,8 +7,8 @@ from aws_cdk import (
     aws_events as events,
     aws_events_targets as targets,
 )
+from aws_cdk.aws_lambda import DockerImageFunction, DockerImageCode
 from constructs import Construct
-
 
 class MedallionDataPlatformStack(Stack):
 
@@ -46,23 +46,15 @@ class MedallionDataPlatformStack(Stack):
             },
         )
 
-        x_lambda = lambda_.Function(
+        x_lambda = DockerImageFunction(
             self, "XLambda",
             function_name="x-dataset-collector",
-            runtime=lambda_.Runtime.PYTHON_3_12,
-            handler="handler.handler",
-            code=lambda_.Code.from_asset(
-                "lambdas/bronze/twitter",
-                bundling={
-                    "image": lambda_.Runtime.PYTHON_3_12.bundling_image,
-                    "command": [
-                        "bash", "-c",
-                        "pip install -r requirements.txt -t /asset-output && cp -r . /asset-output",
-                    ],
-                },
+            code=DockerImageCode.from_image_asset(
+                directory="lambdas/bronze/twitter",
+                # Opciono: možete specificirati Dockerfile (kreirajte ga)
             ),
             timeout=Duration.minutes(5),
-            memory_size=256,
+            memory_size=512,  # može i više
             environment={
                 "S3_BUCKET_NAME": bronze_bucket.bucket_name,
             },
