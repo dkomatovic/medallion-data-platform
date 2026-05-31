@@ -1,4 +1,3 @@
 boto3
 pandas
 datasets
-dotenv

@@ -3,8 +3,6 @@ from datetime import datetime, timezone
 import boto3
 import pandas as pd
 from datasets import load_dataset
-from dotenv import load_dotenv
-load_dotenv()
 
 data_sites = [
     {
@@ -68,7 +66,7 @@ def save(data, dataset_name, date_str, file_format="csv"):
         print(f"Saved locally: {putanja}")
 
 
-def download_from_huggingface(repo_id, split, rename_map=None):
+def download_from_huggingface(repo_id, split):
     """
     Download dataset from Hugging Face Hub-a and returnes pandas DataFrame.
     """
