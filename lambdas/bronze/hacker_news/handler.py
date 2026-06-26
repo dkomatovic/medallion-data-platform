@@ -41,6 +41,7 @@ def get_hourly(type, ys_start, ys_end):
             print(f"  GRESKA: API vratio status {response.status_code}")
             break
 
+        response.encoding = "utf-8"
         data = response.json()
         posts = data.get("hits", [])
         all_posts.extend(posts)
