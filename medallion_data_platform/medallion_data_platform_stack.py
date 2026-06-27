@@ -21,6 +21,7 @@ def make_lambda(
     bucket,
     timeout_minutes=15,
     memory=256,
+    layers=None,
 ):
     fn = lambda_.Function(
         scope,
@@ -42,6 +43,7 @@ def make_lambda(
         timeout=Duration.minutes(timeout_minutes),
         memory_size=memory,
         environment={"S3_BUCKET_NAME": bucket.bucket_name},
+        layers=layers or [],
     )
     bucket.grant_write(fn)
     return fn
@@ -51,6 +53,13 @@ class MedallionDataPlatformStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # Javni AWS Lambda Layer sa awswrangler + pandas + pyarrow
+        sdk_pandas_layer = lambda_.LayerVersion.from_layer_version_arn(
+            self,
+            "AWSSDKPandasLayer",
+            "arn:aws:lambda:eu-north-1:336392948345:layer:AWSSDKPandas-Python312:18",
+        )
 
         bronze_bucket = s3.Bucket(
             self,
@@ -85,7 +94,31 @@ class MedallionDataPlatformStack(Stack):
         )
         bronze_bucket.grant_write(x_lambda)
 
-        # Step Functions — HN i Twitter rade paralelno
+        # Silver HN Lambda — cita bronze, upisuje silver
+        silver_hn_lambda = make_lambda(
+            self,
+            "SilverHackerNewsLambda",
+            function_name="silver-hacker-news",
+            asset_path="lambdas/silver/hacker_news",
+            bucket=bronze_bucket,
+            timeout_minutes=15,
+            layers=[sdk_pandas_layer],
+        )
+        bronze_bucket.grant_read(silver_hn_lambda)
+
+        # Gold HN Lambda — cita silver, upisuje gold
+        gold_hn_lambda = make_lambda(
+            self,
+            "GoldHackerNewsLambda",
+            function_name="gold-hacker-news",
+            asset_path="lambdas/gold/hacker_news",
+            bucket=bronze_bucket,
+            timeout_minutes=5,
+            layers=[sdk_pandas_layer],
+        )
+        bronze_bucket.grant_read(gold_hn_lambda)
+
+        # Step Functions — Bronze: HN i Twitter rade paralelno
         collect_hn = sfn_tasks.LambdaInvoke(
             self,
             "CollectHackerNews",
@@ -104,18 +137,36 @@ class MedallionDataPlatformStack(Stack):
         parallel_collect.branch(collect_hn)
         parallel_collect.branch(collect_x)
 
-        bronze_state_machine = sfn.StateMachine(
+        # Silver i Gold — rade sekvencijalno posle bronze-a
+        silver_hn_task = sfn_tasks.LambdaInvoke(
             self,
-            "BronzeOrchestrator",
-            state_machine_name="bronze-orchestrator",
-            definition_body=sfn.DefinitionBody.from_chainable(parallel_collect),
-            timeout=Duration.hours(1),
+            "SilverHackerNews",
+            lambda_function=silver_hn_lambda,
+            output_path="$.Payload",
         )
 
-        # EventBridge - pokrece oba u paraleli svaki dan u 02:00 UTC
+        gold_hn_task = sfn_tasks.LambdaInvoke(
+            self,
+            "GoldHackerNews",
+            lambda_function=gold_hn_lambda,
+            output_path="$.Payload",
+        )
+
+        # Pipeline: parallel bronze → silver HN → gold HN
+        pipeline = parallel_collect.next(silver_hn_task).next(gold_hn_task)
+
+        state_machine = sfn.StateMachine(
+            self,
+            "MedallionOrchestrator",
+            state_machine_name="medallion-orchestrator",
+            definition_body=sfn.DefinitionBody.from_chainable(pipeline),
+            timeout=Duration.hours(2),
+        )
+
+        # EventBridge - pokrece ceo pipeline svaki dan u 02:00 UTC
         events.Rule(
             self,
-            "DailyBronzeSchedule",
+            "DailyMedallionSchedule",
             schedule=events.Schedule.cron(hour="2", minute="0"),
-            targets=[targets.SfnStateMachine(bronze_state_machine)],
+            targets=[targets.SfnStateMachine(state_machine)],
         )
