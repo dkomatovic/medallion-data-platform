@@ -3,6 +3,7 @@ import re
 import json
 import html
 import uuid
+import shutil
 import boto3
 import requests
 import pandas as pd
@@ -213,7 +214,9 @@ def write_table(df, table_name, partition_cols):
         print(f"  Sacuvano: {putanja} ({len(df)} redova)")
     else:
         putanja = os.path.join(LOCAL_OUTPUT, table_name)
-        os.makedirs(putanja, exist_ok=True)
+        if os.path.exists(putanja):
+            shutil.rmtree(putanja)
+        os.makedirs(putanja)
         df.to_parquet(putanja, partition_cols=partition_cols, engine="pyarrow")
         print(f"  Sacuvano: {putanja} ({len(df)} redova)")
 
