@@ -59,11 +59,16 @@ def daily_post_counts(posts_df, date_str):
 
 
 def daily_user_count(users_df, date_str):
-    """Ukupan broj HN korisnika za taj dan."""
+    """Ukupan broj HN korisnika i broj novih (registrovanih tog dana)."""
+    new_users = users_df[
+        users_df["created_at"].notna() &
+        users_df["created_at"].str.startswith(date_str)
+    ].shape[0]
     return pd.DataFrame([{
         "date": date_str,
         "platform": PLATFORM,
         "total_users": len(users_df),
+        "new_users": new_users,
     }])
 
 
@@ -160,6 +165,7 @@ def handler(event=None, context=None):
 
     trajanje = (datetime.now(timezone.utc) - vreme_start).total_seconds()
     print(f"\nGotovo! Trajalo: {trajanje:.1f} sekundi")
+    return {"status": "ok", "date": date_str}
 
 
 if __name__ == "__main__":
