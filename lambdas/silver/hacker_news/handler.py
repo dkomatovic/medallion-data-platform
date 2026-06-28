@@ -245,6 +245,7 @@ def handler(event=None, context=None):  # event i context su obavezni Lambda par
 
     trajanje = (datetime.now(timezone.utc) - vreme_start).total_seconds()
     print(f"Gotovo! Trajalo: {trajanje:.1f} sekundi")
+    return {"status": "ok", "date": date_str}
 
 
 if __name__ == "__main__":

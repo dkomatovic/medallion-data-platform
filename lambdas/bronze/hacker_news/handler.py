@@ -132,6 +132,7 @@ def handler(event=None, context=None):
 
     duration = (datetime.now(timezone.utc) - vreme_start).total_seconds()
     print(f"Gotovo! Trajalo: {duration:.1f} sekundi")
+    return {"status": "ok", "date": date_str}
 
 
 # Pokretanje lokalno (python handler.py)
