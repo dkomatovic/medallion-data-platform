@@ -102,6 +102,7 @@ class MedallionDataPlatformStack(Stack):
             asset_path="lambdas/silver/hacker_news",
             bucket=bronze_bucket,
             timeout_minutes=15,
+            memory=1024,
             layers=[sdk_pandas_layer],
         )
         bronze_bucket.grant_read(silver_hn_lambda)
@@ -114,6 +115,7 @@ class MedallionDataPlatformStack(Stack):
             asset_path="lambdas/gold/hacker_news",
             bucket=bronze_bucket,
             timeout_minutes=5,
+            memory=1024,
             layers=[sdk_pandas_layer],
         )
         bronze_bucket.grant_read(gold_hn_lambda)
