@@ -132,6 +132,18 @@ class MedallionDataPlatformStack(Stack):
         )
         bronze_bucket.grant_read(gold_hn_lambda)
 
+        gold_x_lambda = make_lambda(
+            self,
+            "GoldXLambda",
+            function_name="gold-x",
+            asset_path="lambdas/gold/twitter",
+            bucket=bronze_bucket,
+            timeout_minutes=5,
+            memory=1024,
+            layers=[sdk_pandas_layer],
+        )
+        bronze_bucket.grant_read(gold_x_lambda)
+
         # Step Functions — Bronze: HN i Twitter rade paralelno
         collect_hn = sfn_tasks.LambdaInvoke(
             self,
@@ -173,12 +185,23 @@ class MedallionDataPlatformStack(Stack):
             output_path="$.Payload",
         )
 
+        gold_x_task = sfn_tasks.LambdaInvoke(
+            self,
+            "GoldX",
+            lambda_function=gold_x_lambda,
+            output_path="$.Payload",
+        )
+
         parallel_silver = sfn.Parallel(self, "ParallelSilver")
         parallel_silver.branch(silver_hn_task)
         parallel_silver.branch(silver_x_task)
 
-        # Pipeline: parallel bronze → silver HN → gold HN
-        pipeline = parallel_collect.next(parallel_silver).next(gold_hn_task)
+        parallel_gold = sfn.Parallel(self, "ParallelGold")
+        parallel_gold.branch(gold_hn_task)
+        parallel_gold.branch(gold_x_task)
+
+        # Pipeline: parallel bronze → parallel_silver → parallel_gold
+        pipeline = parallel_collect.next(parallel_silver).next(parallel_gold)
 
         state_machine = sfn.StateMachine(
             self,
