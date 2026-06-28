@@ -251,26 +251,26 @@ def write_table(df, table_name, partition_cols):
         return
 
     if S3_BUCKET_NAME:
-        putanja = f"s3://{S3_BUCKET_NAME}/silver/{table_name}/"
+        path = f"s3://{S3_BUCKET_NAME}/silver/{table_name}/"
         wr.s3.to_parquet(
             df=df,
-            path=putanja,
+            path=path,
             dataset=True,
             partition_cols=partition_cols,
             mode="overwrite_partitions",
         )
-        print(f"  Saved: {putanja} ({len(df)} rows)")
+        print(f"  Saved: {path} ({len(df)} rows)")
     else:
-        putanja = os.path.join(LOCAL_OUTPUT, table_name)
-        if os.path.exists(putanja):
-            shutil.rmtree(putanja)
-        os.makedirs(putanja)
-        df.to_parquet(putanja, partition_cols=partition_cols, engine="pyarrow")
-        print(f"  Saved: {putanja} ({len(df)} rows)")
+        path = os.path.join(LOCAL_OUTPUT, table_name)
+        if os.path.exists(path):
+            shutil.rmtree(path)
+        os.makedirs(path)
+        df.to_parquet(path, partition_cols=partition_cols, engine="pyarrow")
+        print(f"  Saved: {path} ({len(df)} rows)")
 
 
 def handler(event=None, context=None):
-    vreme_start = datetime.now(timezone.utc)
+    time_start = datetime.now(timezone.utc)
 
     print("Normalizing X (Twitter) data from bronze layer")
     print(f"PROJECT_ROOT = {PROJECT_ROOT}")
@@ -298,8 +298,8 @@ def handler(event=None, context=None):
     write_table(posts_df, "posts", partition_cols=["year", "month", "day"])
     write_table(users_df, "users", partition_cols=["platform"])
 
-    trajanje = (datetime.now(timezone.utc) - vreme_start).total_seconds()
-    print(f"Done! Lasted: {trajanje:.1f} seconds")
+    duration = (datetime.now(timezone.utc) - time_start).total_seconds()
+    print(f"Done! Lasted: {duration:.1f} seconds")
     return {"status": "ok"}
 
 
