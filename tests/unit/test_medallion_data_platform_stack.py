@@ -73,7 +73,10 @@ def test_discord_notification_resources():
     )
     template.has_resource_properties(
         "AWS::SSM::Parameter",
-        {"Name": "/medallion/discord-webhook-url"},
+        {
+            "Name": "/medallion/discord-webhook-url",
+            "Type": "SecureString",
+        },
     )
     template.has_resource_properties(
         "AWS::Events::Rule",
@@ -89,3 +92,35 @@ def test_discord_notification_resources():
         if v["Properties"].get("FunctionName") == "discord-pipeline-notify"
     )
     assert "VpcConfig" in notify["Properties"]
+
+
+def test_s3_bucket_secured_for_vpc():
+    app = core.App()
+    stack = MedallionDataPlatformStack(app, "medallion-data-platform")
+    template = assertions.Template.from_stack(stack)
+
+    template.has_resource_properties(
+        "AWS::S3::Bucket",
+        {
+            "BucketName": "medallion-bronze-data",
+            "PublicAccessBlockConfiguration": {
+                "BlockPublicAcls": True,
+                "BlockPublicPolicy": True,
+                "IgnorePublicAcls": True,
+                "RestrictPublicBuckets": True,
+            },
+        },
+    )
+    template.has_resource_properties(
+        "AWS::S3::BucketPolicy",
+        {
+            "PolicyDocument": assertions.Match.object_like({
+                "Statement": assertions.Match.array_with([
+                    assertions.Match.object_like({
+                        "Sid": "DenyNonVpcEndpointAccess",
+                        "Effect": "Deny",
+                    }),
+                ]),
+            }),
+        },
+    )

@@ -1,5 +1,7 @@
 from aws_cdk import CfnOutput
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_iam as iam
+from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
 
@@ -15,6 +17,7 @@ class NetworkingConstruct(Construct):
             "MedallionVpc",
             max_azs=2,
             nat_gateways=1,
+            restrict_default_security_group=True,
             nat_gateway_provider=ec2.NatProvider.instance_v2(
                 instance_type=ec2.InstanceType.of(
                     ec2.InstanceClass.T2,
@@ -84,7 +87,12 @@ class NetworkingConstruct(Construct):
             "Ec2SupersetSg",
             vpc=self.vpc,
             description="EC2 sa PostgreSQL i Apache Superset",
-            allow_all_outbound=True,
+            allow_all_outbound=False,
+        )
+        self.sg_ec2.add_egress_rule(
+            ec2.Peer.any_ipv4(),
+            ec2.Port.tcp(443),
+            "HTTPS za Docker image pull pri bootstrapu",
         )
         self.sg_ec2.add_ingress_rule(
             self.sg_sync_lambda,
@@ -132,3 +140,33 @@ class NetworkingConstruct(Construct):
             ),
             "security_groups": [self.sg_notify_lambda],
         }
+
+    def sync_lambda_kwargs(self) -> dict:
+        """VPC podešavanja za sync Lambda (gold S3 -> PostgreSQL)."""
+        return {
+            "vpc": self.vpc,
+            "vpc_subnets": ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            ),
+            "security_groups": [self.sg_sync_lambda],
+        }
+
+    def restrict_bucket_to_vpc(self, bucket: s3.IBucket) -> None:
+        """S3 pristup samo preko VPC gateway endpointa (least privilege)."""
+        bucket.add_to_resource_policy(
+            iam.PolicyStatement(
+                sid="DenyNonVpcEndpointAccess",
+                effect=iam.Effect.DENY,
+                principals=[iam.AnyPrincipal()],
+                actions=["s3:*"],
+                resources=[
+                    bucket.bucket_arn,
+                    bucket.arn_for_objects("*"),
+                ],
+                conditions={
+                    "StringNotEquals": {
+                        "aws:SourceVpce": self.s3_endpoint.vpc_endpoint_id,
+                    },
+                },
+            )
+        )

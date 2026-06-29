@@ -28,6 +28,7 @@ class NotificationsConstruct(Construct):
             "DiscordWebhookUrl",
             parameter_name="/medallion/discord-webhook-url",
             string_value="UNSET",
+            type=ssm.ParameterType.SECURE_STRING,
             description="Discord webhook URL za pipeline alarme (azurirati posle deploy-a)",
         )
 
@@ -69,5 +70,11 @@ class NotificationsConstruct(Construct):
                     "stateMachineArn": [state_machine.state_machine_arn],
                 },
             ),
-            targets=[targets.LambdaFunction(self.notify_lambda)],
+            targets=[
+                targets.LambdaFunction(
+                    self.notify_lambda,
+                    retry_attempts=2,
+                    max_event_age=Duration.minutes(15),
+                )
+            ],
         )

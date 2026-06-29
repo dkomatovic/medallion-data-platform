@@ -74,7 +74,10 @@ class MedallionDataPlatformStack(Stack):
             bucket_name="medallion-bronze-data",
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            enforce_ssl=True,
         )
+        self.network.restrict_bucket_to_vpc(bronze_bucket)
 
         hn_lambda = make_lambda(
             self,
