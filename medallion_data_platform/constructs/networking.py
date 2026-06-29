@@ -122,3 +122,13 @@ class NetworkingConstruct(Construct):
             ),
             "security_groups": [self.sg_lambda_pipeline],
         }
+
+    def notify_lambda_kwargs(self) -> dict:
+        """VPC podešavanja za Discord notify Lambda."""
+        return {
+            "vpc": self.vpc,
+            "vpc_subnets": ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+            ),
+            "security_groups": [self.sg_notify_lambda],
+        }

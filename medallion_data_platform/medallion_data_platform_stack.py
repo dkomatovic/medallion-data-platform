@@ -13,6 +13,7 @@ from aws_cdk.aws_lambda import DockerImageFunction, DockerImageCode
 from constructs import Construct
 
 from medallion_data_platform.constructs.networking import NetworkingConstruct
+from medallion_data_platform.constructs.notifications import NotificationsConstruct
 
 
 def make_lambda(
@@ -221,6 +222,13 @@ class MedallionDataPlatformStack(Stack):
             state_machine_name="medallion-orchestrator",
             definition_body=sfn.DefinitionBody.from_chainable(pipeline),
             timeout=Duration.hours(2),
+        )
+
+        self.notifications = NotificationsConstruct(
+            self,
+            "Notifications",
+            network=self.network,
+            state_machine=state_machine,
         )
 
         # EventBridge - pokrece ceo pipeline svaki dan u 02:00 UTC

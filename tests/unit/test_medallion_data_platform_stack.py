@@ -60,3 +60,32 @@ def test_pipeline_lambdas_in_vpc():
         assert "VpcConfig" in fn["Properties"]
         assert len(fn["Properties"]["VpcConfig"]["SubnetIds"]) >= 1
         assert len(fn["Properties"]["VpcConfig"]["SecurityGroupIds"]) >= 1
+
+
+def test_discord_notification_resources():
+    app = core.App()
+    stack = MedallionDataPlatformStack(app, "medallion-data-platform")
+    template = assertions.Template.from_stack(stack)
+
+    template.has_resource_properties(
+        "AWS::Lambda::Function",
+        {"FunctionName": "discord-pipeline-notify"},
+    )
+    template.has_resource_properties(
+        "AWS::SSM::Parameter",
+        {"Name": "/medallion/discord-webhook-url"},
+    )
+    template.has_resource_properties(
+        "AWS::Events::Rule",
+        {
+            "Description": "Discord alarm na neuspesnom Step Functions run-u",
+            "State": "ENABLED",
+        },
+    )
+
+    functions = template.find_resources("AWS::Lambda::Function")
+    notify = next(
+        v for v in functions.values()
+        if v["Properties"].get("FunctionName") == "discord-pipeline-notify"
+    )
+    assert "VpcConfig" in notify["Properties"]
