@@ -9,7 +9,7 @@ class NetworkingConstruct(Construct):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Jedan NAT instance (t3.micro) umesto NAT Gateway-a (~$32/mesec)
+        # Jedan NAT instance (t2.micro) umesto NAT Gateway-a (~$32/mesec)
         self.vpc = ec2.Vpc(
             self,
             "MedallionVpc",
@@ -17,7 +17,7 @@ class NetworkingConstruct(Construct):
             nat_gateways=1,
             nat_gateway_provider=ec2.NatProvider.instance_v2(
                 instance_type=ec2.InstanceType.of(
-                    ec2.InstanceClass.T3,
+                    ec2.InstanceClass.T2,
                     ec2.InstanceSize.MICRO,
                 ),
             ),
