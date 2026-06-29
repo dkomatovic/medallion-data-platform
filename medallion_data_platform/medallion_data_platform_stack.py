@@ -14,6 +14,7 @@ from constructs import Construct
 
 from medallion_data_platform.constructs.networking import NetworkingConstruct
 from medallion_data_platform.constructs.notifications import NotificationsConstruct
+from medallion_data_platform.constructs.visualization import VisualizationConstruct
 
 
 def make_lambda(
@@ -216,8 +217,27 @@ class MedallionDataPlatformStack(Stack):
         parallel_gold.branch(gold_hn_task)
         parallel_gold.branch(gold_x_task)
 
-        # Pipeline: parallel bronze → parallel_silver → parallel_gold
-        pipeline = parallel_collect.next(parallel_silver).next(parallel_gold)
+        self.visualization = VisualizationConstruct(
+            self,
+            "Visualization",
+            network=self.network,
+            bucket=bronze_bucket,
+            sdk_pandas_layer=sdk_pandas_layer,
+        )
+
+        sync_task = sfn_tasks.LambdaInvoke(
+            self,
+            "SyncGoldToPostgres",
+            lambda_function=self.visualization.sync_lambda,
+            output_path="$.Payload",
+        )
+
+        # Pipeline: parallel bronze → parallel_silver → parallel_gold → sync
+        pipeline = (
+            parallel_collect.next(parallel_silver)
+            .next(parallel_gold)
+            .next(sync_task)
+        )
 
         state_machine = sfn.StateMachine(
             self,

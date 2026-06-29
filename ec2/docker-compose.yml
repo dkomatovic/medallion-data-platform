@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: medallion-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medallion}
+      POSTGRES_USER: ${POSTGRES_USER:-medallion}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medallion -d medallion"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  superset:
+    image: apache/superset:3.1.0
+    container_name: medallion-superset
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-medallion}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medallion}
+    volumes:
+      - ./superset_config.py:/app/pythonpath/superset_config.py:ro
+      - superset_home:/app/superset_home
+    command:
+      - /bin/bash
+      - -c
+      - |
+        pip install psycopg2-binary &&
+        superset db upgrade &&
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@medallion.local --password "$$SUPERSET_ADMIN_PASSWORD" || true &&
+        superset init &&
+        superset run -h 0.0.0.0 -p 8088
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  superset_home:

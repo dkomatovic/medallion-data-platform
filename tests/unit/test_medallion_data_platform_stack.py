@@ -33,7 +33,26 @@ def test_nat_instance_not_gateway():
     template = assertions.Template.from_stack(stack)
 
     template.resource_count_is("AWS::EC2::NatGateway", 0)
-    template.resource_count_is("AWS::EC2::Instance", 1)
+    template.resource_count_is("AWS::EC2::Instance", 2)
+
+
+def test_visualization_resources():
+    app = core.App()
+    stack = MedallionDataPlatformStack(app, "medallion-data-platform")
+    template = assertions.Template.from_stack(stack)
+
+    template.has_resource_properties(
+        "AWS::Lambda::Function",
+        {"FunctionName": "gold-to-postgres-sync"},
+    )
+    template.resource_count_is("AWS::EC2::EIP", 1)
+
+    functions = template.find_resources("AWS::Lambda::Function")
+    sync_fn = next(
+        v for v in functions.values()
+        if v["Properties"].get("FunctionName") == "gold-to-postgres-sync"
+    )
+    assert "VpcConfig" in sync_fn["Properties"]
 
 
 def test_pipeline_lambdas_in_vpc():
