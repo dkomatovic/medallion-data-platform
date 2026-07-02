@@ -1,0 +1,1 @@
+# awswrangler i pandas dolaze iz Lambda Layer-a (AWSSDKPandas-Python312)
