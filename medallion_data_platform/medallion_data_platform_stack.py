@@ -49,6 +49,7 @@ def make_lambda(
         memory_size=memory,
         environment={"S3_BUCKET_NAME": bucket.bucket_name},
         layers=layers or [],
+        allow_public_subnet=True,
         **network.pipeline_lambda_kwargs(),
     )
     bucket.grant_write(fn)
@@ -78,7 +79,6 @@ class MedallionDataPlatformStack(Stack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
         )
-        self.network.restrict_bucket_to_vpc(bronze_bucket)
 
         hn_lambda = make_lambda(
             self,
@@ -100,6 +100,7 @@ class MedallionDataPlatformStack(Stack):
             ),
             timeout=Duration.minutes(10),
             memory_size=512,
+            allow_public_subnet=True, 
             environment={
                 "S3_BUCKET_NAME": bronze_bucket.bucket_name,
             },

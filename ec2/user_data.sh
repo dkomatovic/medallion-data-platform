@@ -4,10 +4,15 @@ set -euxo pipefail
 REGION="${AWS_REGION:-eu-north-1}"
 APP_DIR="/opt/medallion"
 
+# Instaliraj Docker
 dnf install -y docker
 systemctl enable docker
 systemctl start docker
 
+# Čekaj da Docker bude spreman
+sleep 10
+
+# Instaliraj docker-compose
 curl -L "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-$(uname -s)-$(uname -m)" \
   -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
@@ -24,6 +29,7 @@ if ! swapon --show | grep -q /swapfile; then
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
+# Uzmi lozinke iz SSM
 POSTGRES_PASSWORD=$(aws ssm get-parameter \
   --name "/medallion/postgres/password" \
   --with-decryption \
@@ -38,6 +44,7 @@ SUPERSET_ADMIN_PASSWORD=$(aws ssm get-parameter \
   --query "Parameter.Value" \
   --output text)
 
+# Uzmi private IP i upiši u SSM
 PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 
 aws ssm put-parameter \
@@ -47,11 +54,18 @@ aws ssm put-parameter \
   --overwrite \
   --region "${REGION}"
 
-export POSTGRES_DB=medallion
-export POSTGRES_USER=medallion
-export POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
-export SUPERSET_ADMIN_USER=admin
-export SUPERSET_ADMIN_PASSWORD="${SUPERSET_ADMIN_PASSWORD}"
-export SUPERSET_SECRET_KEY="$(openssl rand -hex 32)"
+# Napravi .env fajl za docker-compose
+cat > "${APP_DIR}/.env" <<EOF
+POSTGRES_DB=medallion
+POSTGRES_USER=medallion
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+SUPERSET_ADMIN_USER=admin
+SUPERSET_ADMIN_PASSWORD=${SUPERSET_ADMIN_PASSWORD}
+SUPERSET_SECRET_KEY=$(openssl rand -hex 32)
+EOF
 
+# Pokreni kontejnere
 docker-compose up -d
+
+# Loguj status
+docker-compose ps

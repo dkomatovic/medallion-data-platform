@@ -48,7 +48,7 @@ class VisualizationConstruct(Construct):
             "PostgresPassword",
             parameter_name="/medallion/postgres/password",
             string_value="MedallionPgChangeMe1",
-            type=ssm.ParameterType.SECURE_STRING,
+            #type=ssm.ParameterType.SECURE_STRING,
             description="PostgreSQL password — promeniti posle prvog deploy-a",
         )
 
@@ -57,7 +57,7 @@ class VisualizationConstruct(Construct):
             "SupersetAdminPassword",
             parameter_name="/medallion/superset/admin-password",
             string_value="MedallionAdminChangeMe1",
-            type=ssm.ParameterType.SECURE_STRING,
+            #type=ssm.ParameterType.SECURE_STRING,
             description="Superset admin lozinka — promeniti posle prvog deploy-a",
         )
 
@@ -87,7 +87,7 @@ class VisualizationConstruct(Construct):
             self,
             "SupersetInstance",
             instance_type=ec2.InstanceType.of(
-                ec2.InstanceClass.T2,
+                ec2.InstanceClass.T3,
                 ec2.InstanceSize.MICRO,
             ),
             machine_image=ec2.MachineImage.latest_amazon_linux2023(),
@@ -128,6 +128,7 @@ class VisualizationConstruct(Construct):
             ),
             timeout=Duration.minutes(5),
             memory_size=1024,
+            allow_public_subnet=True, 
             layers=[sdk_pandas_layer],
             environment={
                 "S3_BUCKET_NAME": bucket.bucket_name,

@@ -28,7 +28,7 @@ class NotificationsConstruct(Construct):
             "DiscordWebhookUrl",
             parameter_name="/medallion/discord-webhook-url",
             string_value="UNSET",
-            type=ssm.ParameterType.SECURE_STRING,
+            #type=ssm.ParameterType.SECURE_STRING,
             description="Discord webhook URL za pipeline alarme (azurirati posle deploy-a)",
         )
 
@@ -51,6 +51,7 @@ class NotificationsConstruct(Construct):
             ),
             timeout=Duration.seconds(30),
             memory_size=128,
+            allow_public_subnet=True, 
             environment={
                 "DISCORD_WEBHOOK_PARAM": webhook_param.parameter_name,
             },
