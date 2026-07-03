@@ -61,6 +61,7 @@ def _sync_table(con, table_name):
     s3_path = f"s3://{S3_BUCKET_NAME}/gold/{table_name}/"
     try:
         df = wr.s3.read_parquet(path=s3_path, dataset=True)
+        print(f"  '{table_name}': ucitano {len(df)} redova, kolone: {list(df.columns)}")
     except Exception as exc:
         print(f"  Preskacem '{table_name}': nema podataka ({exc})")
         return {"table": table_name, "rows": 0, "status": "skipped"}
@@ -79,7 +80,6 @@ def _sync_table(con, table_name):
     )
     print(f"  Sinhronizovano '{table_name}': {len(df)} redova")
     return {"table": table_name, "rows": len(df), "status": "synced"}
-
 
 def handler(event=None, context=None):
     print(f"Sync gold -> PostgreSQL (bucket={S3_BUCKET_NAME})")

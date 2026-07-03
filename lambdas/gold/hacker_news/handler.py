@@ -75,7 +75,7 @@ def daily_user_count(users_df, date_str):
 def top10_karma(users_df, date_str, ascending):
     """Top 10 korisnika po karma score-u (najveci ili najmanji)."""
     valid = users_df[users_df["karma_score"].notna()].copy()
-    valid["karma_score"] = pd.to_numeric(valid["karma_score"], errors="coerce")
+    valid["karma_score"] = pd.to_numeric(valid["karma_score"], errors="coerce").astype("float64")
     valid = valid.dropna(subset=["karma_score"])
     top = (
         valid.nsmallest(10, "karma_score") if ascending
