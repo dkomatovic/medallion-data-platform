@@ -51,11 +51,9 @@ class NotificationsConstruct(Construct):
             ),
             timeout=Duration.seconds(30),
             memory_size=128,
-            allow_public_subnet=True, 
             environment={
                 "DISCORD_WEBHOOK_PARAM": webhook_param.parameter_name,
             },
-            **network.notify_lambda_kwargs(),
         )
         webhook_param.grant_read(self.notify_lambda)
 

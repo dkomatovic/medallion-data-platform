@@ -27,7 +27,12 @@ def make_lambda(
     timeout_minutes=15,
     memory=256,
     layers=None,
+    use_vpc=False,
 ):
+    kwargs = {}
+    if use_vpc:
+        kwargs = network.pipeline_lambda_kwargs()
+
     fn = lambda_.Function(
         scope,
         construct_id,
@@ -49,8 +54,7 @@ def make_lambda(
         memory_size=memory,
         environment={"S3_BUCKET_NAME": bucket.bucket_name},
         layers=layers or [],
-        allow_public_subnet=True,
-        **network.pipeline_lambda_kwargs(),
+        **kwargs,
     )
     bucket.grant_write(fn)
     return fn
@@ -88,6 +92,7 @@ class MedallionDataPlatformStack(Stack):
             bucket=bronze_bucket,
             network=self.network,
             timeout_minutes=15,
+            use_vpc=False,
         )
 
         # X Lambda koristi Docker image zbog vecih zavisnosti (pandas, datasets)
@@ -100,11 +105,9 @@ class MedallionDataPlatformStack(Stack):
             ),
             timeout=Duration.minutes(10),
             memory_size=512,
-            allow_public_subnet=True, 
             environment={
                 "S3_BUCKET_NAME": bronze_bucket.bucket_name,
             },
-            **self.network.pipeline_lambda_kwargs(),
         )
         bronze_bucket.grant_write(x_lambda)
 
@@ -119,6 +122,7 @@ class MedallionDataPlatformStack(Stack):
             timeout_minutes=15,
             memory=1024,
             layers=[sdk_pandas_layer],
+            use_vpc=False,
         )
         bronze_bucket.grant_read(silver_hn_lambda)
 
@@ -132,6 +136,7 @@ class MedallionDataPlatformStack(Stack):
             timeout_minutes=15,
             memory=1024,
             layers=[sdk_pandas_layer],
+            use_vpc=False,
         )
         bronze_bucket.grant_read(silver_x_lambda)
 
@@ -146,6 +151,7 @@ class MedallionDataPlatformStack(Stack):
             timeout_minutes=5,
             memory=1024,
             layers=[sdk_pandas_layer],
+            use_vpc=False,
         )
         bronze_bucket.grant_read(gold_hn_lambda)
 
@@ -159,6 +165,7 @@ class MedallionDataPlatformStack(Stack):
             timeout_minutes=5,
             memory=1024,
             layers=[sdk_pandas_layer],
+            use_vpc=False,
         )
         bronze_bucket.grant_read(gold_x_lambda)
 

@@ -1,1 +1,1 @@
-# awswrangler dolazi iz Lambda Layer-a (AWSSDKPandas-Python312)
+pg8000

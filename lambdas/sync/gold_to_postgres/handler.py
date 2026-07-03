@@ -3,12 +3,11 @@ import os
 
 import awswrangler as wr
 import boto3
+import pg8000
 
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 POSTGRES_HOST_PARAM = os.environ.get("POSTGRES_HOST_PARAM", "/medallion/postgres/host")
-POSTGRES_PASSWORD_PARAM = os.environ.get(
-    "POSTGRES_PASSWORD_PARAM", "/medallion/postgres/password"
-)
+POSTGRES_PASSWORD_PARAM = os.environ.get("POSTGRES_PASSWORD_PARAM", "/medallion/postgres/password")
 POSTGRES_DB = os.environ.get("POSTGRES_DB", "medallion")
 POSTGRES_USER = os.environ.get("POSTGRES_USER", "medallion")
 POSTGRES_PORT = int(os.environ.get("POSTGRES_PORT", "5432"))
@@ -38,6 +37,7 @@ def _get_ssm_param(name, decrypt=False):
 def _postgres_connection():
     host = _get_ssm_param(POSTGRES_HOST_PARAM)
     password = _get_ssm_param(POSTGRES_PASSWORD_PARAM, decrypt=True)
+
     if not host or host == "UNSET":
         raise ValueError(
             f"PostgreSQL host nije konfigurisan ({POSTGRES_HOST_PARAM}). "
@@ -47,7 +47,8 @@ def _postgres_connection():
         raise ValueError(
             f"PostgreSQL password nije konfigurisan ({POSTGRES_PASSWORD_PARAM})."
         )
-    return wr.postgresql.connect(
+
+    return pg8000.connect(
         host=host,
         port=POSTGRES_PORT,
         user=POSTGRES_USER,
@@ -85,10 +86,10 @@ def handler(event=None, context=None):
 
     con = _postgres_connection()
     try:
-        wr.postgresql.execute(
-            sql=f"CREATE SCHEMA IF NOT EXISTS {POSTGRES_SCHEMA}",
-            con=con,
-        )
+        cur = con.cursor()
+        cur.execute(f"CREATE SCHEMA IF NOT EXISTS {POSTGRES_SCHEMA}")
+        con.commit()
+        cur.close()
 
         results = []
         for table in GOLD_TABLES:

@@ -31,6 +31,15 @@ class NetworkingConstruct(Construct):
             service=ec2.GatewayVpcEndpointAwsService.S3,
         )
 
+        self.ssm_endpoint = self.vpc.add_interface_endpoint(
+            "SsmEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.SSM,
+            subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PUBLIC,
+            ),
+            private_dns_enabled=True,
+        )
+
         self.sg_lambda_pipeline = ec2.SecurityGroup(
             self,
             "LambdaPipelineSg",
