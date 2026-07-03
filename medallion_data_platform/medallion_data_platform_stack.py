@@ -12,6 +12,10 @@ from aws_cdk import aws_stepfunctions_tasks as sfn_tasks
 from aws_cdk.aws_lambda import DockerImageFunction, DockerImageCode
 from constructs import Construct
 
+from medallion_data_platform.constructs.networking import NetworkingConstruct
+from medallion_data_platform.constructs.notifications import NotificationsConstruct
+from medallion_data_platform.constructs.visualization import VisualizationConstruct
+
 
 def make_lambda(
     scope,
@@ -19,10 +23,16 @@ def make_lambda(
     function_name,
     asset_path,
     bucket,
+    network,
     timeout_minutes=15,
     memory=256,
     layers=None,
+    use_vpc=False,
 ):
+    kwargs = {}
+    if use_vpc:
+        kwargs = network.pipeline_lambda_kwargs()
+
     fn = lambda_.Function(
         scope,
         construct_id,
@@ -44,6 +54,7 @@ def make_lambda(
         memory_size=memory,
         environment={"S3_BUCKET_NAME": bucket.bucket_name},
         layers=layers or [],
+        **kwargs,
     )
     bucket.grant_write(fn)
     return fn
@@ -53,6 +64,8 @@ class MedallionDataPlatformStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        self.network = NetworkingConstruct(self, "Network")
 
         # Javni AWS Lambda Layer sa awswrangler + pandas + pyarrow
         sdk_pandas_layer = lambda_.LayerVersion.from_layer_version_arn(
@@ -67,6 +80,8 @@ class MedallionDataPlatformStack(Stack):
             bucket_name="medallion-bronze-data",
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            enforce_ssl=True,
         )
 
         hn_lambda = make_lambda(
@@ -75,7 +90,9 @@ class MedallionDataPlatformStack(Stack):
             function_name="hacker-news-collector",
             asset_path="lambdas/bronze/hacker_news",
             bucket=bronze_bucket,
+            network=self.network,
             timeout_minutes=15,
+            use_vpc=False,
         )
 
         # X Lambda koristi Docker image zbog vecih zavisnosti (pandas, datasets)
@@ -101,9 +118,11 @@ class MedallionDataPlatformStack(Stack):
             function_name="silver-hacker-news",
             asset_path="lambdas/silver/hacker_news",
             bucket=bronze_bucket,
+            network=self.network,
             timeout_minutes=15,
             memory=1024,
             layers=[sdk_pandas_layer],
+            use_vpc=False,
         )
         bronze_bucket.grant_read(silver_hn_lambda)
 
@@ -113,9 +132,11 @@ class MedallionDataPlatformStack(Stack):
             function_name="silver-x",
             asset_path="lambdas/silver/twitter",
             bucket=bronze_bucket,
+            network=self.network,
             timeout_minutes=15,
             memory=1024,
             layers=[sdk_pandas_layer],
+            use_vpc=False,
         )
         bronze_bucket.grant_read(silver_x_lambda)
 
@@ -126,9 +147,11 @@ class MedallionDataPlatformStack(Stack):
             function_name="gold-hacker-news",
             asset_path="lambdas/gold/hacker_news",
             bucket=bronze_bucket,
+            network=self.network,
             timeout_minutes=5,
             memory=1024,
             layers=[sdk_pandas_layer],
+            use_vpc=False,
         )
         bronze_bucket.grant_read(gold_hn_lambda)
 
@@ -138,9 +161,11 @@ class MedallionDataPlatformStack(Stack):
             function_name="gold-x",
             asset_path="lambdas/gold/twitter",
             bucket=bronze_bucket,
+            network=self.network,
             timeout_minutes=5,
             memory=1024,
             layers=[sdk_pandas_layer],
+            use_vpc=False,
         )
         bronze_bucket.grant_read(gold_x_lambda)
 
@@ -200,8 +225,27 @@ class MedallionDataPlatformStack(Stack):
         parallel_gold.branch(gold_hn_task)
         parallel_gold.branch(gold_x_task)
 
-        # Pipeline: parallel bronze → parallel_silver → parallel_gold
-        pipeline = parallel_collect.next(parallel_silver).next(parallel_gold)
+        self.visualization = VisualizationConstruct(
+            self,
+            "Visualization",
+            network=self.network,
+            bucket=bronze_bucket,
+            sdk_pandas_layer=sdk_pandas_layer,
+        )
+
+        sync_task = sfn_tasks.LambdaInvoke(
+            self,
+            "SyncGoldToPostgres",
+            lambda_function=self.visualization.sync_lambda,
+            output_path="$.Payload",
+        )
+
+        # Pipeline: parallel bronze → parallel_silver → parallel_gold → sync
+        pipeline = (
+            parallel_collect.next(parallel_silver)
+            .next(parallel_gold)
+            .next(sync_task)
+        )
 
         state_machine = sfn.StateMachine(
             self,
@@ -209,6 +253,13 @@ class MedallionDataPlatformStack(Stack):
             state_machine_name="medallion-orchestrator",
             definition_body=sfn.DefinitionBody.from_chainable(pipeline),
             timeout=Duration.hours(2),
+        )
+
+        self.notifications = NotificationsConstruct(
+            self,
+            "Notifications",
+            network=self.network,
+            state_machine=state_machine,
         )
 
         # EventBridge - pokrece ceo pipeline svaki dan u 02:00 UTC
